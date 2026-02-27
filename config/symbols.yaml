@@ -1,0 +1,33 @@
+version: 1
+
+primary:
+  us:
+    name: lbma_gold_usd_pm
+    market: US
+    symbol: LBMA_GOLD_PM_USD
+    source: lbma
+    currency: USD
+    unit: oz
+  cn:
+    name: sge_au9999_cny_g
+    market: CN
+    symbol: SGE_AU9999
+    source: sge
+    currency: CNY
+    unit: gram
+
+fallback:
+  us:
+    - name: xauusd_spot
+      market: US
+      symbol: XAUUSD
+      source: xauusd
+      currency: USD
+      unit: oz
+  cn:
+    - name: shfe_au_main
+      market: CN
+      symbol: SHFE_AU
+      source: shfe
+      currency: CNY
+      unit: gram

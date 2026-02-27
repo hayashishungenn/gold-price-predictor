@@ -1,0 +1,19 @@
+version: 1
+targets:
+  next_1d_return:
+    task: regression
+    horizon: 1
+    label: next trading day return
+  direction_prob:
+    task: classification
+    horizon: 1
+    positive_label: up
+    label: next trading day up probability
+  vol_forecast:
+    task: regression
+    horizon: 1
+    label: next trading day volatility proxy
+output_bundle:
+  - point_forecast
+  - direction_probability
+  - prediction_interval

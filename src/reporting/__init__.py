@@ -1,0 +1,1 @@
+from pipeline_reporting import generate_daily_report

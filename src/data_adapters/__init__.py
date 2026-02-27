@@ -1,0 +1,1 @@
+from pipeline_data import ingest_all_data

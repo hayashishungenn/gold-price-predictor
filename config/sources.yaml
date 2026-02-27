@@ -1,0 +1,34 @@
+version: 1
+adapters:
+  lbma:
+    enabled: true
+    priority: 1
+    endpoint: https://prices.lbma.org.uk/json/gold_pm.json
+  xauusd:
+    enabled: true
+    priority: 2
+    ticker: XAUUSD=X
+  sge:
+    enabled: true
+    priority: 1
+    symbol: Au99.99
+  shfe:
+    enabled: true
+    priority: 2
+    symbol: AU0
+  fx:
+    enabled: true
+    ticker: USDCNY=X
+  macro:
+    enabled: true
+    tickers:
+      dxy: DX-Y.NYB
+      us10y: ^TNX
+      vix: ^VIX
+      spx: ^GSPC
+      oil: CL=F
+ingestion:
+  years_history: 8
+  incremental: true
+  save_raw_snapshot: true
+  allow_synthetic_fallback: true
