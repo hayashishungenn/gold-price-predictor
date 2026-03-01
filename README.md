@@ -34,9 +34,9 @@ Workflow file: `.github/workflows/daily_report.yml`
 
 Recommended schedule:
 
-- Weekdays at `09:17` Asia/Shanghai, which is `01:17 UTC`.
-- This timing is chosen for same-day buy decisions: it is after the usual morning RMB central parity update window, and still before the `09:30` A-share continuous session.
-- The workflow deliberately avoids running at the top of the hour because GitHub Actions scheduled jobs can be delayed more often around `:00`.
+- Trigger at `18:00` Asia/Shanghai, which is `10:00 UTC`.
+- The cron is configured on weekdays, and the workflow additionally checks the China trading calendar at runtime so national holidays are skipped automatically.
+- This timing is suitable if you want to make a same-day evening buy decision after the domestic session has closed and the day-level CN data is more likely to be complete.
 
 Required repository secrets for email delivery:
 

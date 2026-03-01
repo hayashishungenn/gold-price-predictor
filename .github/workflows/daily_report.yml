@@ -13,7 +13,7 @@ on:
         default: true
         type: boolean
   schedule:
-    - cron: "17 1 * * 1-5"
+    - cron: "0 10 * * 1-5"
 
 concurrency:
   group: daily-gold-report
@@ -72,14 +72,30 @@ jobs:
           echo "report_date=${REPORT_DATE}" >> "$GITHUB_OUTPUT"
           echo "train_flag=${TRAIN_FLAG}" >> "$GITHUB_OUTPUT"
 
+      - name: Check China trading day
+        id: calendar
+        if: github.event_name == 'schedule'
+        shell: bash
+        run: |
+          OUTPUT="$(python scripts/is_cn_trade_day.py --date "${REPORT_DATE}")"
+          echo "$OUTPUT"
+          TRADE_DAY="$(echo "$OUTPUT" | awk -F= '/^is_trade_day=/{print $2}')"
+          echo "is_trade_day=${TRADE_DAY}" >> "$GITHUB_OUTPUT"
+
+      - name: Skip non-trading day
+        if: github.event_name == 'schedule' && steps.calendar.outputs.is_trade_day != 'true'
+        run: echo "Today is not a China trading day. Workflow exits without generating a report."
+
       - name: Run pipeline
+        if: github.event_name != 'schedule' || steps.calendar.outputs.is_trade_day == 'true'
         run: python run_pipeline.py --asof "$REPORT_DATE" "$TRAIN_FLAG"
 
       - name: Send email
-        if: env.EMAIL_SENDER != '' && env.EMAIL_PASSWORD != '' && env.EMAIL_RECEIVERS != ''
+        if: (github.event_name != 'schedule' || steps.calendar.outputs.is_trade_day == 'true') && env.EMAIL_SENDER != '' && env.EMAIL_PASSWORD != '' && env.EMAIL_RECEIVERS != ''
         run: python scripts/send_report_email.py --report-date "$REPORT_DATE"
 
       - name: Upload report artifacts
+        if: github.event_name != 'schedule' || steps.calendar.outputs.is_trade_day == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: gold-report-${{ steps.params.outputs.report_date }}
