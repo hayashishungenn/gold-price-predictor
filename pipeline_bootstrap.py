@@ -101,6 +101,12 @@ DEFAULT_FILES: dict[str, str] = {
             symbol: AU0
           fx:
             enabled: true
+            provider_order:
+              - chinamoney
+              - yfinance
+              - frankfurter
+            currency_pair: USD/CNY
+            chunk_days: 30
             ticker: USDCNY=X
           macro:
             enabled: true

@@ -15,6 +15,27 @@ from pipeline_io import ensure_datetime, to_feature_long, write_dataframe
 
 LOGGER = logging.getLogger(__name__)
 OZ_TO_GRAM = 31.1034768
+CHINAMONEY_DIRECT_BASES = {"USD", "EUR", "100JPY", "HKD", "GBP", "AUD", "NZD", "SGD", "CHF", "CAD"}
+CHINAMONEY_DIRECT_QUOTES = {
+    "MYR",
+    "RUB",
+    "ZAR",
+    "KRW",
+    "AED",
+    "SAR",
+    "HUF",
+    "PLN",
+    "DKK",
+    "SEK",
+    "NOK",
+    "TRY",
+    "MXN",
+    "THB",
+}
+CHINAMONEY_USER_AGENTS = [
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko)",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.0.3 Mobile/15E148 Safari/604.1",
+]
 
 
 def _safe_float(value: Any) -> float | None:
@@ -41,6 +62,21 @@ def _coerce_columns(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out.columns = [str(c).strip().lower() for c in out.columns]
     return out
+
+
+def _random_user_agent() -> str:
+    idx = int(np.random.randint(0, len(CHINAMONEY_USER_AGENTS)))
+    return CHINAMONEY_USER_AGENTS[idx]
+
+
+def _normalize_chinamoney_currency(currency_pair: str) -> tuple[str, bool]:
+    pair = str(currency_pair).strip().upper().replace(" ", "")
+    base, _, quote = pair.partition("/")
+    if not base or not quote:
+        return "USD/CNY", False
+    inverse = base in CHINAMONEY_DIRECT_QUOTES or quote in CHINAMONEY_DIRECT_BASES
+    normalized = f"{quote}/{base}" if inverse else f"{base}/{quote}"
+    return normalized, inverse
 
 
 def _first_existing(df: pd.DataFrame, names: list[str]) -> str | None:
@@ -258,13 +294,90 @@ class FXAdapter(YahooAdapter):
     source_name = "fx"
 
     def fetch(self, start: date, end: date, source_cfg: dict[str, Any]) -> pd.DataFrame:
-        frame = super().fetch(start=start, end=end, source_cfg=source_cfg)
-        if frame.empty:
-            frame = self._fetch_frankfurter(start=start, end=end)
-            if frame.empty:
-                return frame
-            return frame
-        return frame.rename(columns={"close": "usdcny_close"})
+        provider_order = source_cfg.get("provider_order", ["chinamoney", "yfinance", "frankfurter"])
+        if not isinstance(provider_order, list):
+            provider_order = ["chinamoney", "yfinance", "frankfurter"]
+
+        for provider_name in provider_order:
+            provider = str(provider_name).strip().lower()
+            if provider in {"yfinance", "yahoo"}:
+                frame = super().fetch(start=start, end=end, source_cfg=source_cfg)
+                if not frame.empty:
+                    return frame.rename(columns={"close": "usdcny_close"})
+            elif provider == "chinamoney":
+                frame = self._fetch_chinamoney(start=start, end=end, source_cfg=source_cfg)
+                if not frame.empty:
+                    return frame
+            elif provider == "frankfurter":
+                frame = self._fetch_frankfurter(start=start, end=end)
+                if not frame.empty:
+                    return frame
+            else:
+                LOGGER.warning("Unknown FX provider: %s", provider_name)
+        return pd.DataFrame()
+
+    def _fetch_chinamoney(self, start: date, end: date, source_cfg: dict[str, Any]) -> pd.DataFrame:
+        currency_pair = source_cfg.get("currency_pair", "USD/CNY")
+        normalized_pair, invert = _normalize_chinamoney_currency(currency_pair)
+        chunk_days = min(max(int(source_cfg.get("chunk_days", 30)), 1), 30)
+
+        current_end = end
+        frames: list[pd.DataFrame] = []
+        while current_end >= start:
+            current_start = max(start, current_end - timedelta(days=chunk_days - 1))
+            frame = self._fetch_chinamoney_window(
+                start=current_start,
+                end=current_end,
+                currency_pair=normalized_pair,
+            )
+            if not frame.empty:
+                frames.append(frame)
+            current_end = current_start - timedelta(days=1)
+
+        if not frames:
+            return pd.DataFrame(columns=["date", "usdcny_close"])
+
+        out = pd.concat(frames, axis=0, ignore_index=True)
+        out = out.dropna(subset=["date", "usdcny_close"]).sort_values("date")
+        out = out.drop_duplicates(subset=["date"], keep="last")
+        if invert:
+            out["usdcny_close"] = np.where(out["usdcny_close"] != 0, 1.0 / out["usdcny_close"], np.nan)
+        return out
+
+    def _fetch_chinamoney_window(self, start: date, end: date, currency_pair: str) -> pd.DataFrame:
+        endpoint = "http://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew"
+        headers = {
+            "Referer": "http://www.chinamoney.com.cn/chinese/bkccpr/",
+            "Origin": "http://www.chinamoney.com.cn",
+            "Host": "www.chinamoney.com.cn",
+            "X-Requested-With": "XMLHttpRequest",
+            "user-agent": _random_user_agent(),
+        }
+        params = {
+            "startDate": start.isoformat(),
+            "endDate": end.isoformat(),
+            "currency": currency_pair,
+            "pageNum": 1,
+            "pageSize": 30,
+        }
+        try:
+            response = requests.post(endpoint, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:
+            LOGGER.warning("ChinaMoney FX fetch failed for %s: %s", currency_pair, exc)
+            return pd.DataFrame(columns=["date", "usdcny_close"])
+
+        rows = []
+        for item in payload.get("records", []):
+            if not isinstance(item, dict):
+                continue
+            value = _safe_float(item.get("values"))
+            dt_value = pd.to_datetime(item.get("date"), errors="coerce")
+            if pd.isna(dt_value) or value is None:
+                continue
+            rows.append({"date": dt_value, "usdcny_close": value})
+        return pd.DataFrame(rows)
 
     def _fetch_frankfurter(self, start: date, end: date) -> pd.DataFrame:
         endpoint = f"https://api.frankfurter.app/{start.isoformat()}..{end.isoformat()}"
