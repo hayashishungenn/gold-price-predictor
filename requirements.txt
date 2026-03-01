@@ -9,3 +9,4 @@ matplotlib>=3.8.0
 requests>=2.31.0
 yfinance>=0.2.40
 python-dateutil>=2.9.0
+akshare>=1.18.30

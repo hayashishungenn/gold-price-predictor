@@ -11,7 +11,16 @@ from jinja2 import Environment
 from pipeline_io import ensure_datetime, from_feature_long
 
 
-plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "SimSun", "Arial Unicode MS", "DejaVu Sans"]
+plt.rcParams["font.sans-serif"] = [
+    "Noto Sans CJK SC",
+    "Noto Sans CJK JP",
+    "WenQuanYi Zen Hei",
+    "Microsoft YaHei",
+    "SimHei",
+    "SimSun",
+    "Arial Unicode MS",
+    "DejaVu Sans",
+]
 plt.rcParams["axes.unicode_minus"] = False
 
 

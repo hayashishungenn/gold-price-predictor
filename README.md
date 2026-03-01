@@ -27,3 +27,25 @@ Outputs are written to:
 - `data/processed/*`
 - `models/*`
 - `reports/*`
+
+## GitHub Actions
+
+Workflow file: `.github/workflows/daily_report.yml`
+
+Recommended schedule:
+
+- Weekdays at `09:17` Asia/Shanghai, which is `01:17 UTC`.
+- This timing is chosen for same-day buy decisions: it is after the usual morning RMB central parity update window, and still before the `09:30` A-share continuous session.
+- The workflow deliberately avoids running at the top of the hour because GitHub Actions scheduled jobs can be delayed more often around `:00`.
+
+Required repository secrets for email delivery:
+
+- `EMAIL_SENDER`
+- `EMAIL_PASSWORD`
+- `EMAIL_RECEIVERS`
+
+Manual run:
+
+- Open the `Daily Gold Report` workflow in GitHub Actions.
+- Optionally set `asof` to a specific date.
+- Leave `train=true` for a full fresh run, or set `train=false` if you later decide to rely on prebuilt models.
