@@ -54,7 +54,7 @@ def main() -> None:
     html_body = _strip_non_email_sections(html_body)
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"黄金购买参考日报（中文版） {args.report_date}"
+    msg["Subject"] = f"黄金决策仪表盘 {args.report_date}"
     msg["From"] = sender
     msg["To"] = ", ".join(receivers)
     msg.attach(MIMEText(plain_text, "plain", "utf-8"))

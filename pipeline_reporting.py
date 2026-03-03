@@ -32,41 +32,60 @@ HTML_TEMPLATE = """
   <title>{{ report_title }}</title>
   <style>
     :root {
-      --bg: #f6f1e7;
+      --bg: #f5efe2;
       --paper: #fffdf8;
       --ink: #1f1a14;
       --muted: #6f665d;
-      --line: #e5d7bf;
+      --line: #e4d8c3;
       --gold: #b8871b;
       --up: #1f7a45;
       --down: #a33a2b;
       --warn: #a66a00;
-      --soft-up: #e6f4ea;
-      --soft-down: #fae9e7;
-      --soft-warn: #fff4df;
-      --card-shadow: 0 10px 24px rgba(80, 58, 22, 0.08);
+      --soft-up: #e7f4eb;
+      --soft-down: #fae8e5;
+      --soft-warn: #fff4dd;
+      --soft-neutral: #f2ede5;
+      --card-shadow: 0 12px 28px rgba(77, 58, 27, 0.08);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      background: radial-gradient(circle at top right, #f2dca7 0, rgba(242, 220, 167, 0) 28%), var(--bg);
       color: var(--ink);
+      background:
+        radial-gradient(circle at top right, rgba(216, 165, 58, 0.18) 0, rgba(216, 165, 58, 0) 32%),
+        linear-gradient(180deg, #f9f3e8 0%, #f4ecdf 100%);
       font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
       line-height: 1.65;
     }
-    .container { max-width: 1120px; margin: 0 auto; padding: 28px 20px 40px; }
-    .hero, .grid-2, .chart-grid { display: grid; gap: 18px; }
-    .hero { grid-template-columns: 1.2fr 0.8fr; margin-bottom: 18px; }
-    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .container {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 26px 20px 40px;
+    }
+    .hero, .grid-2, .chart-grid, .metric-grid, .signal-grid {
+      display: grid;
+      gap: 18px;
+    }
+    .hero { grid-template-columns: 1.3fr 0.7fr; margin-bottom: 18px; }
+    .grid-2, .signal-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .chart-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .hero-main, .hero-side, .panel {
+    .hero-main, .hero-side, .panel, .metric-card {
       background: var(--paper);
       border: 1px solid var(--line);
       border-radius: 18px;
-      padding: 22px;
       box-shadow: var(--card-shadow);
     }
-    .eyebrow { margin: 0 0 8px; color: var(--gold); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .hero-main, .hero-side, .panel { padding: 22px; }
+    .metric-card { padding: 18px; }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--gold);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
     h1, h2, h3 { margin: 0 0 10px; line-height: 1.3; }
     h1 { font-size: 30px; }
     h2 { font-size: 22px; margin-top: 28px; }
@@ -74,22 +93,86 @@ HTML_TEMPLATE = """
     p { margin: 0 0 10px; }
     .lead { font-size: 18px; font-weight: 600; }
     .muted { color: var(--muted); font-size: 13px; }
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0 14px;
+    }
     .badge {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       padding: 6px 12px;
       border-radius: 999px;
       font-size: 12px;
       font-weight: 700;
-      margin-bottom: 12px;
     }
     .positive { background: var(--soft-up); color: var(--up); }
     .negative { background: var(--soft-down); color: var(--down); }
     .warning { background: var(--soft-warn); color: var(--warn); }
-    .neutral { background: #f0ece6; color: #5d5348; }
-    .kv-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; margin: 12px 0 0; }
-    .kv-item { padding: 10px 12px; background: #fcfaf5; border: 1px solid #efe3d0; border-radius: 12px; }
-    .kv-item .k { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-    .kv-item .v { display: block; font-size: 16px; font-weight: 700; }
+    .neutral { background: var(--soft-neutral); color: #5d5348; }
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .metric-value {
+      font-size: 18px;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .metric-note {
+      color: var(--muted);
+      font-size: 12px;
+      display: block;
+    }
+    .summary-list, .clean {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0 0;
+    }
+    .summary-list li, .clean li {
+      padding: 12px 14px;
+      border: 1px solid #eee3d2;
+      border-radius: 12px;
+      background: #fcfaf5;
+      margin-bottom: 10px;
+    }
+    .summary-list strong {
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .signal-item { border-left: 4px solid #d8c39d; }
+    .signal-item.positive { border-left-color: #6eb27d; }
+    .signal-item.negative { border-left-color: #d2776b; }
+    .signal-item.warning { border-left-color: #d8a23a; }
+    .signal-item.neutral { border-left-color: #c4b7a1; }
+    .kv-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 18px;
+      margin: 12px 0 0;
+    }
+    .kv-item {
+      padding: 10px 12px;
+      background: #fcfaf5;
+      border: 1px solid #efe3d0;
+      border-radius: 12px;
+    }
+    .kv-item .k {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .kv-item .v {
+      display: block;
+      font-size: 16px;
+      font-weight: 700;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -100,15 +183,20 @@ HTML_TEMPLATE = """
       overflow: hidden;
       box-shadow: var(--card-shadow);
     }
-    th, td { padding: 12px 14px; border-bottom: 1px solid #efe6d8; vertical-align: top; text-align: left; }
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #efe6d8;
+      vertical-align: top;
+      text-align: left;
+    }
     th { background: #f8f2e7; font-size: 13px; }
     tr:last-child td { border-bottom: none; }
-    ul.clean { list-style: none; padding: 0; margin: 10px 0 0; }
-    ul.clean li { padding: 10px 12px; border: 1px solid #efe3d0; border-radius: 12px; background: #fcfaf5; margin-bottom: 10px; }
-    .signal-item { border-left: 4px solid #d8c39d; }
-    .signal-item.positive { border-left-color: #6eb27d; }
-    .signal-item.negative { border-left-color: #d2776b; }
-    .signal-item.warning { border-left-color: #d8a23a; }
+    .section-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: -2px;
+      margin-bottom: 10px;
+    }
     .chart-grid img {
       width: 100%;
       border-radius: 14px;
@@ -116,9 +204,23 @@ HTML_TEMPLATE = """
       background: #fff;
       box-shadow: var(--card-shadow);
     }
-    .chart-caption { margin-top: 8px; color: var(--muted); font-size: 12px; }
-    @media (max-width: 900px) {
-      .hero, .grid-2, .chart-grid, .kv-list { grid-template-columns: 1fr; }
+    .chart-caption {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .footer-note {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 980px) {
+      .hero, .grid-2, .signal-grid, .chart-grid, .kv-list { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .metric-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -126,24 +228,87 @@ HTML_TEMPLATE = """
   <div class="container">
     <section class="hero">
       <div class="hero-main">
-        <p class="eyebrow">Gold Daily Analysis</p>
+        <p class="eyebrow">Gold Decision Dashboard</p>
         <h1>{{ report_title }}</h1>
         <p class="muted">报告日期：{{ report_date }} | 数据截至：{{ data_cutoff_text }}</p>
+        <div class="pill-row">
+          <span class="badge {{ core_view.tone_class }}">{{ core_view.dashboard_icon }} {{ core_view.action_tag }}</span>
+          <span class="badge neutral">评分 {{ core_view.decision_score }}</span>
+          <span class="badge neutral">{{ core_view.trend_label }}</span>
+          <span class="badge neutral">置信度 {{ core_view.confidence_label }}</span>
+        </div>
         <p class="lead">{{ core_view.summary }}</p>
         <p>{{ core_view.execution_note }}</p>
-        <p class="muted">结论置信度：{{ core_view.confidence_label }} | {{ core_view.freshness_note }}</p>
       </div>
       <div class="hero-side">
-        <div class="badge {{ core_view.tone_class }}">{{ core_view.action_tag }}</div>
-        <p><strong>一句话执行建议：</strong>{{ core_view.action_line }}</p>
-        <p><strong>主导因素：</strong>{{ core_view.dominant_driver }}</p>
-        <p><strong>当前约束：</strong>{{ core_view.constraint_line }}</p>
-        <p class="muted">格式参考了日度投资决策简报的组织方式：先给一句话判断，再给价格区间、检查清单与风险说明。</p>
+        <h3>📰 重要信息速览</h3>
+        <ul class="clean">
+          <li><strong>执行建议：</strong>{{ core_view.action_line }}</li>
+          <li><strong>主导因素：</strong>{{ core_view.dominant_driver }}</li>
+          <li><strong>数据时效：</strong>{{ core_view.freshness_note }}</li>
+          <li><strong>当前约束：</strong>{{ core_view.constraint_line }}</li>
+        </ul>
       </div>
     </section>
 
     <section>
-      <h2>今日操作计划</h2>
+      <h2>📊 分析结果摘要</h2>
+      <ul class="summary-list">
+        {% for row in market_brief_rows %}
+        <li class="signal-item {{ row.tone_class }}"><strong>{{ row.icon }} {{ row.label }}</strong>{{ row.decision }} | {{ row.detail }}</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    <section>
+      <h2>🎯 决策看板</h2>
+      <div class="metric-grid">
+        {% for row in dashboard_metrics %}
+        <div class="metric-card">
+          <span class="metric-label">{{ row.label }}</span>
+          <span class="metric-value">{{ row.value }}</span>
+          <span class="metric-note">{{ row.note }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section>
+      <div class="grid-2">
+        <div class="panel">
+          <h2>🚨 风险警报</h2>
+          <p class="section-note">优先展示会削弱当天结论可信度的时效、漂移和异常波动信息。</p>
+          <ul class="clean">
+            {% for row in risk_alert_rows %}
+            <li class="signal-item {{ row.tone_class }}">{{ row.text }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        <div class="panel">
+          <h2>✨ 利好催化</h2>
+          <p class="section-note">将模型方向、驱动贡献和显著偏强信号合并成买入侧观察列表。</p>
+          <ul class="clean">
+            {% for row in catalyst_rows %}
+            <li class="signal-item {{ row.tone_class }}"><strong>{{ row.title }}：</strong>{{ row.text }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="panel">
+        <h2>📢 最新动态</h2>
+        <ul class="clean">
+          {% for row in update_rows %}
+          <li>{{ row }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>📋 今日操作计划</h2>
       <table>
         <thead><tr><th>项目</th><th>数值</th><th>说明</th></tr></thead>
         <tbody>
@@ -155,7 +320,7 @@ HTML_TEMPLATE = """
     </section>
 
     <section>
-      <h2>操作检查清单</h2>
+      <h2>✅ 操作检查清单</h2>
       <table>
         <thead><tr><th>检查项</th><th>状态</th><th>解读</th></tr></thead>
         <tbody>
@@ -167,7 +332,7 @@ HTML_TEMPLATE = """
     </section>
 
     <section>
-      <h2>市场状态概览</h2>
+      <h2>📈 市场状态概览</h2>
       <div class="grid-2">
         {% for card in market_cards %}
         <div class="panel">
@@ -188,7 +353,7 @@ HTML_TEMPLATE = """
     </section>
 
     <section>
-      <h2>驱动拆解</h2>
+      <h2>🧠 驱动拆解</h2>
       <table>
         <thead><tr><th>驱动项</th><th>贡献</th><th>解读</th></tr></thead>
         <tbody>
@@ -200,8 +365,8 @@ HTML_TEMPLATE = """
     </section>
 
     <section>
-      <h2>重点信号</h2>
-      <div class="grid-2">
+      <h2>🔍 重点信号</h2>
+      <div class="signal-grid">
         <div class="panel">
           <h3>美盘侧</h3>
           <ul class="clean">
@@ -222,29 +387,17 @@ HTML_TEMPLATE = """
     </section>
 
     <section>
-      <h2>模型可信度摘要</h2>
-      <div class="panel">
-        <ul class="clean">
-          {% for row in model_notes %}
-          <li>{{ row }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </section>
-
-    <section>
-      <h2>风险与数据质量</h2>
       <div class="grid-2">
         <div class="panel">
-          <h3>主要风险</h3>
+          <h2>🛡️ 模型可信度</h2>
           <ul class="clean">
-            {% for row in risk_rows %}
-            <li class="signal-item {{ row.tone_class }}">{{ row.text }}</li>
+            {% for row in model_notes %}
+            <li>{{ row }}</li>
             {% endfor %}
           </ul>
         </div>
         <div class="panel">
-          <h3>数据状态</h3>
+          <h2>🗂️ 数据来源</h2>
           <table>
             <thead><tr><th>市场</th><th>主序列</th><th>最新日期</th><th>来源</th><th>合成兜底</th></tr></thead>
             <tbody>
@@ -265,6 +418,8 @@ HTML_TEMPLATE = """
         <div><img src="{{ charts.cn_decomposition }}" alt="cn decomposition" /><p class="chart-caption">国内金价预测的三因子拆解：美盘 / 汇率 / 溢价</p></div>
       </div>
     </section>
+
+    <p class="footer-note">以上为基于历史数据、滚动回测与下一交易日收益预测生成的量化简报，不构成个性化投资建议。</p>
   </div>
 </body>
 </html>
@@ -786,6 +941,132 @@ def _build_execution_rows(cn_card: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
+def _clip_int(value: int, low: int, high: int) -> int:
+    return max(low, min(high, value))
+
+
+def _tone_icon(tone_class: str) -> str:
+    if tone_class == "positive":
+        return "🟢"
+    if tone_class == "negative":
+        return "🔴"
+    if tone_class == "warning":
+        return "🟡"
+    return "⚪"
+
+
+def _status_icon(status: str) -> str:
+    if status == "满足":
+        return "✅"
+    if status == "不满足":
+        return "❌"
+    return "🟡"
+
+
+def _market_outlook(point_return: float | None, up_probability: float | None) -> dict[str, str]:
+    if point_return is None or up_probability is None:
+        tone_class, label = "neutral", "信息不足"
+    elif point_return >= 0.005 and up_probability >= 0.55:
+        tone_class, label = "positive", "看多"
+    elif point_return <= -0.005 and up_probability <= 0.45:
+        tone_class, label = "negative", "看空"
+    elif point_return >= 0:
+        tone_class, label = "warning", "偏多"
+    elif point_return < 0:
+        tone_class, label = "warning", "偏弱"
+    else:
+        tone_class, label = "neutral", "震荡"
+    return {"label": label, "tone_class": tone_class, "icon": _tone_icon(tone_class)}
+
+
+def _execution_lookup(execution_rows: list[dict[str, str]], label: str) -> dict[str, str]:
+    for row in execution_rows:
+        if row.get("label") == label:
+            return row
+    return {"label": label, "value": "N/A", "note": "N/A"}
+
+
+def _build_market_brief_rows(us_card: dict[str, Any], cn_card: dict[str, Any], core_view: dict[str, Any]) -> list[dict[str, str]]:
+    us_outlook = _market_outlook(us_card.get("point_return_num"), us_card.get("up_probability_num"))
+    return [
+        {
+            "label": "国内金价",
+            "icon": core_view["dashboard_icon"],
+            "decision": core_view["action_tag"],
+            "detail": f"评分 {core_view['decision_score']} | {core_view['trend_label']} | 点预测 {cn_card['point_return']} | 上涨概率 {cn_card['up_probability']}",
+            "tone_class": core_view["tone_class"],
+        },
+        {
+            "label": "美盘金价",
+            "icon": us_outlook["icon"],
+            "decision": us_outlook["label"],
+            "detail": f"点预测 {us_card['point_return']} | 上涨概率 {us_card['up_probability']} | {us_card['commentary']}",
+            "tone_class": us_outlook["tone_class"],
+        },
+    ]
+
+
+def _build_dashboard_metrics(cn_card: dict[str, Any], core_view: dict[str, Any], execution_rows: list[dict[str, str]], data_cutoff_text: str) -> list[dict[str, str]]:
+    observe_row = _execution_lookup(execution_rows, "观察区")
+    avoid_row = _execution_lookup(execution_rows, "不宜追高线")
+    return [
+        {"label": "国内判断", "value": f"{core_view['dashboard_icon']} {core_view['action_tag']}", "note": f"评分 {core_view['decision_score']} | {core_view['trend_label']}"},
+        {"label": "上涨概率", "value": cn_card.get("up_probability", "N/A"), "note": f"点预测 {cn_card.get('point_return', 'N/A')}"},
+        {"label": "观察区", "value": observe_row["value"], "note": observe_row["note"]},
+        {"label": "不追高线", "value": avoid_row["value"], "note": avoid_row["note"]},
+        {"label": "数据截至", "value": data_cutoff_text, "note": f"置信度 {core_view['confidence_label']}"},
+    ]
+
+
+def _build_risk_alert_rows(risk_rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    alert_rows = [row for row in risk_rows if row.get("tone_class") != "positive"]
+    return (alert_rows or risk_rows)[:4]
+
+
+def _build_catalyst_rows(cn_card: dict[str, Any], driver_rows: list[dict[str, Any]], us_signal_rows: list[dict[str, Any]], cn_signal_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def _push(title: str, text: str, tone_class: str) -> None:
+        key = f"{title}|{text}"
+        if key in seen:
+            return
+        seen.add(key)
+        rows.append({"title": title, "text": text, "tone_class": tone_class})
+
+    point_return = cn_card.get("point_return_num")
+    if point_return is not None and point_return > 0:
+        _push("模型方向", f"国内点预测为 {cn_card['point_return']}，主场景仍偏向上行。", "positive")
+
+    for row in driver_rows:
+        if (row.get("value_num") or 0.0) > 0:
+            _push(row["label"], f"{row['label']} 贡献 {row['value']}，当前对国内金价形成支撑。", "positive")
+
+    for prefix, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
+        for signal in signal_rows:
+            if signal.get("tone_class") == "positive":
+                _push(f"{prefix}信号", signal["description"], "positive")
+
+    if not rows:
+        rows.append({"title": "暂无强催化", "text": "当前未见足够清晰的多头共振，更适合等待更优价格。", "tone_class": "warning"})
+    return rows[:4]
+
+
+def _build_update_rows(core_view: dict[str, Any], execution_rows: list[dict[str, str]], us_signal_rows: list[dict[str, Any]], cn_signal_rows: list[dict[str, Any]]) -> list[str]:
+    observe_row = _execution_lookup(execution_rows, "观察区")
+    updates = [f"观察区位于 {observe_row['value']}，{core_view['action_line']}", f"当前约束：{core_view['constraint_line']}"]
+
+    signal_pool: list[dict[str, Any]] = []
+    for market_label, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
+        for row in signal_rows:
+            description = row.get("description")
+            if description:
+                signal_pool.append({"text": f"{market_label}侧：{description}", "score": abs(float(row.get('z_score') or 0.0))})
+    signal_pool = sorted(signal_pool, key=lambda item: item["score"], reverse=True)
+    updates.extend(item["text"] for item in signal_pool[:2])
+    return updates[:4]
+
+
 def _status_tuple(status: str) -> tuple[str, str]:
     if status == "满足":
         return status, "positive"
@@ -858,6 +1139,38 @@ def _build_core_view(asof: pd.Timestamp, cn_card: dict[str, Any], driver_rows: l
     if cn_lag is not None and cn_lag > 3:
         confidence_score -= 1
     confidence_label = "中高" if confidence_score >= 2 else ("中等" if confidence_score >= 0 else "偏低")
+    dashboard_score = 50
+    dashboard_score += _clip_int(int(round((up_probability - 0.5) * 120)), -18, 18)
+    dashboard_score += _clip_int(int(round(point_return * 1200)), -12, 12)
+    if cn_direction_acc is not None:
+        dashboard_score += _clip_int(int(round((cn_direction_acc - 0.5) * 100)), -15, 15)
+    if high_drift_count <= 3:
+        dashboard_score += 5
+    elif high_drift_count >= 9:
+        dashboard_score -= 12
+    elif high_drift_count >= 6:
+        dashboard_score -= 8
+    if cn_lag is not None:
+        if cn_lag <= 2:
+            dashboard_score += 5
+        elif cn_lag >= 5:
+            dashboard_score -= 8
+    if range_position is not None:
+        if point_return >= 0 and range_position >= 0.85:
+            dashboard_score -= 10
+        elif point_return >= 0 and range_position <= 0.35:
+            dashboard_score += 4
+    dashboard_score = _clip_int(dashboard_score, 0, 100)
+    if dashboard_score >= 70:
+        trend_label = "看多"
+    elif dashboard_score >= 55:
+        trend_label = "偏多"
+    elif dashboard_score >= 45:
+        trend_label = "震荡"
+    elif dashboard_score >= 30:
+        trend_label = "偏弱"
+    else:
+        trend_label = "看空"
 
     summary = f"模型对下一交易日国内金价的判断为 {action_tag}：点预测 {_fmt_pct(point_return)}，上涨概率 {_fmt_prob(up_probability)}。{dominant_driver}"
     action_line = (
@@ -884,6 +1197,9 @@ def _build_core_view(asof: pd.Timestamp, cn_card: dict[str, Any], driver_rows: l
         "summary": summary,
         "action_tag": action_tag,
         "tone_class": tone_class,
+        "dashboard_icon": _tone_icon(tone_class),
+        "decision_score": str(dashboard_score),
+        "trend_label": trend_label,
         "confidence_label": confidence_label,
         "action_line": action_line,
         "execution_note": execution_note,
@@ -940,7 +1256,7 @@ def generate_daily_report(
     active_symbols: dict[str, Any],
 ) -> tuple[Path, Path]:
     report_date = pd.to_datetime(asof).date().isoformat()
-    report_title = f"黄金购买参考日报（中文版）- {report_date}"
+    report_title = f"黄金决策仪表盘 - {report_date}"
     daily_dir = project_root / "reports" / "daily"
     assets_dir = daily_dir / "assets"
     daily_dir.mkdir(parents=True, exist_ok=True)
@@ -974,14 +1290,25 @@ def generate_daily_report(
     model_notes = _build_model_notes(backtest_metrics)
     us_signal_rows = _build_signal_rows(features_daily, asof=asof, feature_names=["us_gold_usd", "us_ret_5d", "us_ret_20d", "us_rsi_14", "dxy", "us10y", "vix", "spx", "oil"])
     cn_signal_rows = _build_signal_rows(features_daily, asof=asof, feature_names=["cn_close", "cn_ret_5d", "cn_ret_20d", "cn_premium", "premium_z_20", "usdcny_close", "fx_return", "cb_gold_netbuy"])
+    data_cutoff_text = _data_cutoff_text(data_status, asof)
+    market_brief_rows = _build_market_brief_rows(us_card, cn_card, core_view)
+    dashboard_metrics = _build_dashboard_metrics(cn_card, core_view, execution_rows, data_cutoff_text)
+    risk_alert_rows = _build_risk_alert_rows(risk_rows)
+    catalyst_rows = _build_catalyst_rows(cn_card, driver_rows, us_signal_rows, cn_signal_rows)
+    update_rows = _build_update_rows(core_view, execution_rows, us_signal_rows, cn_signal_rows)
 
     env = Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
     template = env.from_string(HTML_TEMPLATE)
     html = template.render(
         report_title=report_title,
         report_date=report_date,
-        data_cutoff_text=_data_cutoff_text(data_status, asof),
+        data_cutoff_text=data_cutoff_text,
         core_view=core_view,
+        market_brief_rows=market_brief_rows,
+        dashboard_metrics=dashboard_metrics,
+        risk_alert_rows=risk_alert_rows,
+        catalyst_rows=catalyst_rows,
+        update_rows=update_rows,
         execution_rows=execution_rows,
         checklist_rows=checklist_rows,
         market_cards=[us_card, cn_card],
@@ -989,7 +1316,6 @@ def generate_daily_report(
         us_signal_rows=us_signal_rows,
         cn_signal_rows=cn_signal_rows,
         model_notes=model_notes,
-        risk_rows=risk_rows,
         data_status_rows=data_rows,
         charts={
             "price_trend": str(price_chart.name if price_chart.parent == daily_dir else f"assets/{price_chart.name}"),
@@ -1002,36 +1328,56 @@ def generate_daily_report(
     md_path = daily_dir / f"{report_date}_gold_report.md"
     html_path.write_text(html, encoding="utf-8")
 
-    md_lines = [f"# {report_title}", "", "## 一句话核心结论", f"- {core_view['summary']}", f"- 执行建议：{core_view['action_line']}", f"- 结论置信度：{core_view['confidence_label']}", f"- 数据时效：{core_view['freshness_note']}", "", "## 今日操作计划"]
+    md_lines = [
+        f"# 🎯 {report_title}",
+        "",
+        f"国内判断：{core_view['dashboard_icon']} {core_view['action_tag']} | 评分 {core_view['decision_score']} | {core_view['trend_label']}",
+        f"数据截至：{data_cutoff_text} | 结论置信度：{core_view['confidence_label']}",
+        "",
+        "## 📊 分析结果摘要",
+    ]
+    for row in market_brief_rows:
+        md_lines.append(f"- {row['icon']} {row['label']}：{row['decision']} | {row['detail']}")
+    md_lines.extend(["", "## 📰 重要信息速览", f"- 结论：{core_view['summary']}", f"- 执行建议：{core_view['action_line']}", f"- 主导因素：{core_view['dominant_driver']}", f"- 数据时效：{core_view['freshness_note']}", f"- 当前约束：{core_view['constraint_line']}", "", "## 🎯 决策看板"])
+    for row in dashboard_metrics:
+        md_lines.append(f"- {row['label']}：{row['value']}。{row['note']}")
+    md_lines.extend(["", "## 🚨 风险警报"])
+    for index, row in enumerate(risk_alert_rows, start=1):
+        md_lines.append(f"- 风险点{index}：{row['text']}")
+    md_lines.extend(["", "## ✨ 利好催化"])
+    for index, row in enumerate(catalyst_rows, start=1):
+        md_lines.append(f"- 利好{index}：{row['title']}。{row['text']}")
+    md_lines.extend(["", "## 📢 最新动态"])
+    for row in update_rows:
+        md_lines.append(f"- {row}")
+    md_lines.extend(["", "## 📋 今日操作计划"])
     for row in execution_rows:
         md_lines.append(f"- {row['label']}：{row['value']}。{row['note']}")
-    md_lines.extend(["", "## 操作检查清单"])
+    md_lines.extend(["", "## ✅ 操作检查清单"])
     for row in checklist_rows:
-        md_lines.append(f"- [{row['status']}] {row['label']}：{row['detail']}")
-    md_lines.extend(["", "## 市场状态概览", "### 美盘"])
+        md_lines.append(f"- {_status_icon(row['status'])} {row['label']}：{row['status']}。{row['detail']}")
+    md_lines.extend(["", "## 📈 市场状态概览", "### 美盘"])
     for line in [f"最新价格：{us_card['latest_close']}", f"模型点预测：{us_card['point_return']}", f"上涨概率：{us_card['up_probability']}", f"P10 / P90：{us_card['interval']}", f"近1日 / 5日 / 20日：{us_card['ret_1d']} / {us_card['ret_5d']} / {us_card['ret_20d']}", f"近1年区间位置：{us_card['range_position']}", us_card["commentary"]]:
         md_lines.append(f"- {line}")
     md_lines.extend(["", "### 国内"])
     for line in [f"最新价格：{cn_card['latest_close']}", f"模型点预测：{cn_card['point_return']}", f"上涨概率：{cn_card['up_probability']}", f"P10 / P90：{cn_card['interval']}", f"近1日 / 5日 / 20日：{cn_card['ret_1d']} / {cn_card['ret_5d']} / {cn_card['ret_20d']}", f"近1年区间位置：{cn_card['range_position']}", cn_card["commentary"]]:
         md_lines.append(f"- {line}")
-    md_lines.extend(["", "## 驱动拆解"])
+    md_lines.extend(["", "## 🧠 驱动拆解"])
     for row in driver_rows:
         md_lines.append(f"- {row['label']}：{row['value']}。{row['note']}")
-    md_lines.extend(["", "## 重点信号", "### 美盘侧"])
+    md_lines.extend(["", "## 🔍 重点信号", "### 美盘侧"])
     for row in us_signal_rows:
         md_lines.append(f"- {row['description']}")
     md_lines.extend(["", "### 国内侧"])
     for row in cn_signal_rows:
         md_lines.append(f"- {row['description']}")
-    md_lines.extend(["", "## 模型可信度摘要"])
+    md_lines.extend(["", "## 🛡️ 模型可信度"])
     for row in model_notes:
         md_lines.append(f"- {row}")
-    md_lines.extend(["", "## 风险与数据质量"])
-    for row in risk_rows:
-        md_lines.append(f"- {row['text']}")
-    md_lines.extend(["", "## 数据来源"])
+    md_lines.extend(["", "## 🗂️ 数据来源"])
     for row in data_rows:
         md_lines.append(f"- {row['market']}：主序列 {row['symbol']}，最新日期 {row['latest_date']}，来源 {row['source']}，合成兜底 {row['synthetic']}。")
+    md_lines.extend(["", "## 📎 图表附录", f"- 价格走势：assets/{price_chart.name}", f"- 区间带：assets/{interval_chart.name}", f"- 驱动拆解图：assets/{decomp_chart.name}"])
     md_lines.extend(["", "> 注：以上为基于历史数据、滚动回测与下一交易日收益预测生成的量化简报，不构成个性化投资建议。"])
     md_path.write_text("\n".join(md_lines).strip() + "\n", encoding="utf-8")
     return html_path, md_path
