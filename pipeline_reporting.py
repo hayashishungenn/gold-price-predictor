@@ -477,6 +477,19 @@ CONTRIBUTION_LABELS = {
     "CN_premium": "国内溢价",
 }
 
+TONE_ICONS = {
+    "positive": "🟢",
+    "negative": "🔴",
+    "warning": "🟡",
+    "neutral": "⚪",
+}
+
+STATUS_ICONS = {
+    "满足": "✅",
+    "不满足": "❌",
+    "留意": "🟡",
+}
+
 
 def _safe_float(value: Any) -> float | None:
     try:
@@ -941,132 +954,6 @@ def _build_execution_rows(cn_card: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def _clip_int(value: int, low: int, high: int) -> int:
-    return max(low, min(high, value))
-
-
-def _tone_icon(tone_class: str) -> str:
-    if tone_class == "positive":
-        return "🟢"
-    if tone_class == "negative":
-        return "🔴"
-    if tone_class == "warning":
-        return "🟡"
-    return "⚪"
-
-
-def _status_icon(status: str) -> str:
-    if status == "满足":
-        return "✅"
-    if status == "不满足":
-        return "❌"
-    return "🟡"
-
-
-def _market_outlook(point_return: float | None, up_probability: float | None) -> dict[str, str]:
-    if point_return is None or up_probability is None:
-        tone_class, label = "neutral", "信息不足"
-    elif point_return >= 0.005 and up_probability >= 0.55:
-        tone_class, label = "positive", "看多"
-    elif point_return <= -0.005 and up_probability <= 0.45:
-        tone_class, label = "negative", "看空"
-    elif point_return >= 0:
-        tone_class, label = "warning", "偏多"
-    elif point_return < 0:
-        tone_class, label = "warning", "偏弱"
-    else:
-        tone_class, label = "neutral", "震荡"
-    return {"label": label, "tone_class": tone_class, "icon": _tone_icon(tone_class)}
-
-
-def _execution_lookup(execution_rows: list[dict[str, str]], label: str) -> dict[str, str]:
-    for row in execution_rows:
-        if row.get("label") == label:
-            return row
-    return {"label": label, "value": "N/A", "note": "N/A"}
-
-
-def _build_market_brief_rows(us_card: dict[str, Any], cn_card: dict[str, Any], core_view: dict[str, Any]) -> list[dict[str, str]]:
-    us_outlook = _market_outlook(us_card.get("point_return_num"), us_card.get("up_probability_num"))
-    return [
-        {
-            "label": "国内金价",
-            "icon": core_view["dashboard_icon"],
-            "decision": core_view["action_tag"],
-            "detail": f"评分 {core_view['decision_score']} | {core_view['trend_label']} | 点预测 {cn_card['point_return']} | 上涨概率 {cn_card['up_probability']}",
-            "tone_class": core_view["tone_class"],
-        },
-        {
-            "label": "美盘金价",
-            "icon": us_outlook["icon"],
-            "decision": us_outlook["label"],
-            "detail": f"点预测 {us_card['point_return']} | 上涨概率 {us_card['up_probability']} | {us_card['commentary']}",
-            "tone_class": us_outlook["tone_class"],
-        },
-    ]
-
-
-def _build_dashboard_metrics(cn_card: dict[str, Any], core_view: dict[str, Any], execution_rows: list[dict[str, str]], data_cutoff_text: str) -> list[dict[str, str]]:
-    observe_row = _execution_lookup(execution_rows, "观察区")
-    avoid_row = _execution_lookup(execution_rows, "不宜追高线")
-    return [
-        {"label": "国内判断", "value": f"{core_view['dashboard_icon']} {core_view['action_tag']}", "note": f"评分 {core_view['decision_score']} | {core_view['trend_label']}"},
-        {"label": "上涨概率", "value": cn_card.get("up_probability", "N/A"), "note": f"点预测 {cn_card.get('point_return', 'N/A')}"},
-        {"label": "观察区", "value": observe_row["value"], "note": observe_row["note"]},
-        {"label": "不追高线", "value": avoid_row["value"], "note": avoid_row["note"]},
-        {"label": "数据截至", "value": data_cutoff_text, "note": f"置信度 {core_view['confidence_label']}"},
-    ]
-
-
-def _build_risk_alert_rows(risk_rows: list[dict[str, str]]) -> list[dict[str, str]]:
-    alert_rows = [row for row in risk_rows if row.get("tone_class") != "positive"]
-    return (alert_rows or risk_rows)[:4]
-
-
-def _build_catalyst_rows(cn_card: dict[str, Any], driver_rows: list[dict[str, Any]], us_signal_rows: list[dict[str, Any]], cn_signal_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
-    rows: list[dict[str, str]] = []
-    seen: set[str] = set()
-
-    def _push(title: str, text: str, tone_class: str) -> None:
-        key = f"{title}|{text}"
-        if key in seen:
-            return
-        seen.add(key)
-        rows.append({"title": title, "text": text, "tone_class": tone_class})
-
-    point_return = cn_card.get("point_return_num")
-    if point_return is not None and point_return > 0:
-        _push("模型方向", f"国内点预测为 {cn_card['point_return']}，主场景仍偏向上行。", "positive")
-
-    for row in driver_rows:
-        if (row.get("value_num") or 0.0) > 0:
-            _push(row["label"], f"{row['label']} 贡献 {row['value']}，当前对国内金价形成支撑。", "positive")
-
-    for prefix, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
-        for signal in signal_rows:
-            if signal.get("tone_class") == "positive":
-                _push(f"{prefix}信号", signal["description"], "positive")
-
-    if not rows:
-        rows.append({"title": "暂无强催化", "text": "当前未见足够清晰的多头共振，更适合等待更优价格。", "tone_class": "warning"})
-    return rows[:4]
-
-
-def _build_update_rows(core_view: dict[str, Any], execution_rows: list[dict[str, str]], us_signal_rows: list[dict[str, Any]], cn_signal_rows: list[dict[str, Any]]) -> list[str]:
-    observe_row = _execution_lookup(execution_rows, "观察区")
-    updates = [f"观察区位于 {observe_row['value']}，{core_view['action_line']}", f"当前约束：{core_view['constraint_line']}"]
-
-    signal_pool: list[dict[str, Any]] = []
-    for market_label, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
-        for row in signal_rows:
-            description = row.get("description")
-            if description:
-                signal_pool.append({"text": f"{market_label}侧：{description}", "score": abs(float(row.get('z_score') or 0.0))})
-    signal_pool = sorted(signal_pool, key=lambda item: item["score"], reverse=True)
-    updates.extend(item["text"] for item in signal_pool[:2])
-    return updates[:4]
-
-
 def _status_tuple(status: str) -> tuple[str, str]:
     if status == "满足":
         return status, "positive"
@@ -1140,10 +1027,10 @@ def _build_core_view(asof: pd.Timestamp, cn_card: dict[str, Any], driver_rows: l
         confidence_score -= 1
     confidence_label = "中高" if confidence_score >= 2 else ("中等" if confidence_score >= 0 else "偏低")
     dashboard_score = 50
-    dashboard_score += _clip_int(int(round((up_probability - 0.5) * 120)), -18, 18)
-    dashboard_score += _clip_int(int(round(point_return * 1200)), -12, 12)
+    dashboard_score += max(-18, min(18, int(round((up_probability - 0.5) * 120))))
+    dashboard_score += max(-12, min(12, int(round(point_return * 1200))))
     if cn_direction_acc is not None:
-        dashboard_score += _clip_int(int(round((cn_direction_acc - 0.5) * 100)), -15, 15)
+        dashboard_score += max(-15, min(15, int(round((cn_direction_acc - 0.5) * 100))))
     if high_drift_count <= 3:
         dashboard_score += 5
     elif high_drift_count >= 9:
@@ -1160,7 +1047,7 @@ def _build_core_view(asof: pd.Timestamp, cn_card: dict[str, Any], driver_rows: l
             dashboard_score -= 10
         elif point_return >= 0 and range_position <= 0.35:
             dashboard_score += 4
-    dashboard_score = _clip_int(dashboard_score, 0, 100)
+    dashboard_score = max(0, min(100, dashboard_score))
     if dashboard_score >= 70:
         trend_label = "看多"
     elif dashboard_score >= 55:
@@ -1197,7 +1084,7 @@ def _build_core_view(asof: pd.Timestamp, cn_card: dict[str, Any], driver_rows: l
         "summary": summary,
         "action_tag": action_tag,
         "tone_class": tone_class,
-        "dashboard_icon": _tone_icon(tone_class),
+        "dashboard_icon": TONE_ICONS.get(tone_class, TONE_ICONS["neutral"]),
         "decision_score": str(dashboard_score),
         "trend_label": trend_label,
         "confidence_label": confidence_label,
@@ -1291,11 +1178,94 @@ def generate_daily_report(
     us_signal_rows = _build_signal_rows(features_daily, asof=asof, feature_names=["us_gold_usd", "us_ret_5d", "us_ret_20d", "us_rsi_14", "dxy", "us10y", "vix", "spx", "oil"])
     cn_signal_rows = _build_signal_rows(features_daily, asof=asof, feature_names=["cn_close", "cn_ret_5d", "cn_ret_20d", "cn_premium", "premium_z_20", "usdcny_close", "fx_return", "cb_gold_netbuy"])
     data_cutoff_text = _data_cutoff_text(data_status, asof)
-    market_brief_rows = _build_market_brief_rows(us_card, cn_card, core_view)
-    dashboard_metrics = _build_dashboard_metrics(cn_card, core_view, execution_rows, data_cutoff_text)
-    risk_alert_rows = _build_risk_alert_rows(risk_rows)
-    catalyst_rows = _build_catalyst_rows(cn_card, driver_rows, us_signal_rows, cn_signal_rows)
-    update_rows = _build_update_rows(core_view, execution_rows, us_signal_rows, cn_signal_rows)
+
+    us_point_return = us_card.get("point_return_num")
+    us_up_probability = us_card.get("up_probability_num")
+    if us_point_return is None or us_up_probability is None:
+        us_outlook = {"label": "信息不足", "tone_class": "neutral", "icon": TONE_ICONS["neutral"]}
+    elif us_point_return >= 0.005 and us_up_probability >= 0.55:
+        us_outlook = {"label": "看多", "tone_class": "positive", "icon": TONE_ICONS["positive"]}
+    elif us_point_return <= -0.005 and us_up_probability <= 0.45:
+        us_outlook = {"label": "看空", "tone_class": "negative", "icon": TONE_ICONS["negative"]}
+    elif us_point_return >= 0:
+        us_outlook = {"label": "偏多", "tone_class": "warning", "icon": TONE_ICONS["warning"]}
+    else:
+        us_outlook = {"label": "偏弱", "tone_class": "warning", "icon": TONE_ICONS["warning"]}
+
+    market_brief_rows = [
+        {
+            "label": "国内金价",
+            "icon": core_view["dashboard_icon"],
+            "decision": core_view["action_tag"],
+            "detail": f"评分 {core_view['decision_score']} | {core_view['trend_label']} | 点预测 {cn_card['point_return']} | 上涨概率 {cn_card['up_probability']}",
+            "tone_class": core_view["tone_class"],
+        },
+        {
+            "label": "美盘金价",
+            "icon": us_outlook["icon"],
+            "decision": us_outlook["label"],
+            "detail": f"点预测 {us_card['point_return']} | 上涨概率 {us_card['up_probability']} | {us_card['commentary']}",
+            "tone_class": us_outlook["tone_class"],
+        },
+    ]
+
+    execution_map = {row["label"]: row for row in execution_rows}
+    observe_row = execution_map.get("观察区", {"value": "N/A", "note": "N/A"})
+    avoid_row = execution_map.get("不宜追高线", {"value": "N/A", "note": "N/A"})
+    dashboard_metrics = [
+        {"label": "国内判断", "value": f"{core_view['dashboard_icon']} {core_view['action_tag']}", "note": f"评分 {core_view['decision_score']} | {core_view['trend_label']}"},
+        {"label": "上涨概率", "value": cn_card.get("up_probability", "N/A"), "note": f"点预测 {cn_card.get('point_return', 'N/A')}"},
+        {"label": "观察区", "value": observe_row["value"], "note": observe_row["note"]},
+        {"label": "不追高线", "value": avoid_row["value"], "note": avoid_row["note"]},
+        {"label": "数据截至", "value": data_cutoff_text, "note": f"置信度 {core_view['confidence_label']}"},
+    ]
+
+    risk_alert_rows = [row for row in risk_rows if row.get("tone_class") != "positive"][:4]
+    if not risk_alert_rows:
+        risk_alert_rows = risk_rows[:4]
+
+    catalyst_rows: list[dict[str, str]] = []
+    catalyst_seen: set[tuple[str, str]] = set()
+    cn_point_return = cn_card.get("point_return_num")
+    if cn_point_return is not None and cn_point_return > 0:
+        title = "模型方向"
+        text = f"国内点预测为 {cn_card['point_return']}，主场景仍偏向上行。"
+        catalyst_seen.add((title, text))
+        catalyst_rows.append({"title": title, "text": text, "tone_class": "positive"})
+    for row in driver_rows:
+        if (row.get("value_num") or 0.0) <= 0:
+            continue
+        title = row["label"]
+        text = f"{row['label']} 贡献 {row['value']}，当前对国内金价形成支撑。"
+        if (title, text) in catalyst_seen:
+            continue
+        catalyst_seen.add((title, text))
+        catalyst_rows.append({"title": title, "text": text, "tone_class": "positive"})
+    for market_label, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
+        for row in signal_rows:
+            if row.get("tone_class") != "positive":
+                continue
+            title = f"{market_label}信号"
+            text = row["description"]
+            if (title, text) in catalyst_seen:
+                continue
+            catalyst_seen.add((title, text))
+            catalyst_rows.append({"title": title, "text": text, "tone_class": "positive"})
+    if not catalyst_rows:
+        catalyst_rows = [{"title": "暂无强催化", "text": "当前未见足够清晰的多头共振，更适合等待更优价格。", "tone_class": "warning"}]
+    catalyst_rows = catalyst_rows[:4]
+
+    signal_pool: list[dict[str, Any]] = []
+    for market_label, signal_rows in [("美盘", us_signal_rows), ("国内", cn_signal_rows)]:
+        for row in signal_rows:
+            description = row.get("description")
+            if not description:
+                continue
+            signal_pool.append({"text": f"{market_label}侧：{description}", "score": abs(float(row.get("z_score") or 0.0))})
+    signal_pool = sorted(signal_pool, key=lambda item: item["score"], reverse=True)
+    update_rows = [f"观察区位于 {observe_row['value']}，{core_view['action_line']}", f"当前约束：{core_view['constraint_line']}"]
+    update_rows.extend(item["text"] for item in signal_pool[:2])
+    update_rows = update_rows[:4]
 
     env = Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
     template = env.from_string(HTML_TEMPLATE)
@@ -1355,7 +1325,7 @@ def generate_daily_report(
         md_lines.append(f"- {row['label']}：{row['value']}。{row['note']}")
     md_lines.extend(["", "## ✅ 操作检查清单"])
     for row in checklist_rows:
-        md_lines.append(f"- {_status_icon(row['status'])} {row['label']}：{row['status']}。{row['detail']}")
+        md_lines.append(f"- {STATUS_ICONS.get(row['status'], STATUS_ICONS['留意'])} {row['label']}：{row['status']}。{row['detail']}")
     md_lines.extend(["", "## 📈 市场状态概览", "### 美盘"])
     for line in [f"最新价格：{us_card['latest_close']}", f"模型点预测：{us_card['point_return']}", f"上涨概率：{us_card['up_probability']}", f"P10 / P90：{us_card['interval']}", f"近1日 / 5日 / 20日：{us_card['ret_1d']} / {us_card['ret_5d']} / {us_card['ret_20d']}", f"近1年区间位置：{us_card['range_position']}", us_card["commentary"]]:
         md_lines.append(f"- {line}")
